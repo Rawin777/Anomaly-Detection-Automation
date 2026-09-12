@@ -2,7 +2,7 @@
 
 #**AI-Driven Anomaly Detection in Component Burn-in and Screening**
 
-The main idea of our project is to find components that may show abnormal behaviour during **Electrical Stress Screening(ESS)**,even if they are still within the normal fixed limits.
+The main idea of our project is to find components that may show abnormal behaviour during **Environmental Stress Screening(ESS)**,even if they are still within the normal fixed limits.
 
 #**Problem Statement**
 
@@ -128,10 +128,10 @@ Our project aims to:
 
 #**Team**
 
-**Team Name**:SignalForge
+**Team Name**: SignalForge
 
-**Problem StatementID**:SIH26170
+**Problem StatementID**: SIH26170
 
-**Theme**:Smart Automation
+**Theme**: Smart Automation
 
-**PS Category**:Software
+**PS Category**: Software
