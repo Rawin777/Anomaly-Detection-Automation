@@ -8,15 +8,24 @@ st.set_page_config(page_title="ISRO QA Inspector", layout="wide")
 st.title("🛰️ QA Inspector Dashboard (ISRO Latent Anomaly Detection)")
 st.markdown("**Modules C & D Interface**: Batch processing, distribution curves, and traffic-light explainability.")
 
-# 1. Generate Mock Test Lot Data (Simulating a CSV Upload)
-np.random.seed(42)
-components = [f"COMP-{i:03d}" for i in range(1, 101)]
-cryo_pressure = np.random.normal(loc=50.0, scale=2.0, size=100)
+import joblib
 
-# Introduce two latent anomalies (drift)
-cryo_pressure[88] = 62.1 
-cryo_pressure[42] = 37.5
-df = pd.DataFrame({"Component_ID": components, "Cryo_Pressure_psi": cryo_pressure})
+# 1. Provide an upload button for the QA Inspector to upload the test lot CSV
+uploaded_file = st.file_uploader("Upload Telemetry CSV", type=["csv"])
+
+if uploaded_file is not None:
+    # 2. Read the real data
+    df = pd.read_csv(uploaded_file)
+    
+    # 3. Load your teammates' trained AI model
+    model = joblib.load("isro_model.pkl")
+    
+    # 4. Generate SHAP values (Module C)
+    # explainer = shap.TreeExplainer(model)
+    # shap_values = explainer.shap_values(df.drop(columns=['Component_ID']))
+    
+    # 5. Get actual anomaly predictions (Module A/B)
+    df['Status'] = model.predict(df.drop(columns=['Component_ID']))
 
 # 2. Module A/B Math: Dynamic Part Average Testing (DPAT)
 q1 = df["Cryo_Pressure_psi"].quantile(0.25)
