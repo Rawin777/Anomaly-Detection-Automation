@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import joblib
 import os
 
 # Module D: Streamlit Deployment
@@ -10,29 +9,14 @@ st.set_page_config(page_title="ISRO QA Inspector", layout="wide")
 st.title("🛰️ QA Inspector Dashboard (ISRO Latent Anomaly Detection)")
 st.markdown("**Modules C & D Interface**: Batch processing, distribution curves, and traffic-light explainability.")
 
-# 1. Load AI model
-@st.cache_resource
-def load_model():
-    # Construct an absolute path based on where app.py is located
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(base_dir, "Modules", "module_b.pkl")
-    
-    if os.path.exists(model_path):
-        return joblib.load(model_path)
-    return None 
-
-model = load_model()
-
 # Sidebar: Mission Parameters & System Status
 st.sidebar.header("⚙️ Mission Parameters")
-sigma_limit = st.sidebar.slider("DPAT Sigma Tolerance", min_value=1.0, max_value=10.0, value=6.0, step=0.5)
+# We map the teammate's hardcoded "4" threshold to a slider for the pitch
+mad_threshold = st.sidebar.slider("MAD Anomaly Threshold", min_value=1.0, max_value=10.0, value=4.0, step=0.5)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🧠 System Status")
-if model is not None:
-    st.sidebar.success("✅ AI Engine Connected (module_b.pkl)")
-else:
-    st.sidebar.warning("⚠️ AI Engine Offline (Requires Model)")
+st.sidebar.success("✅ Module A Logic Integrated (MAD Engine Active)")
 
 # 2. Upload Box
 uploaded_file = st.file_uploader("Upload Telemetry CSV", type=["csv"])
@@ -45,20 +29,20 @@ if uploaded_file is None:
     empty_fig.update_layout(
         xaxis_title="Component Index (Awaiting Data)", 
         yaxis_title="Telemetry Metric",
-        xaxis=dict(range=[0, 100]), 
-        yaxis=dict(range=[30, 70]),
+        xaxis=dict(range=[0, 10]), 
+        yaxis=dict(range=[5, 20]),
         modebar=dict(color='gray', activecolor='#00CC96') 
     )
     st.plotly_chart(empty_fig, use_container_width=True, theme="streamlit")
-    st.info("👆 Please upload a test lot CSV file to populate the graph and run the AI diagnostics.")
+    st.info("👆 Please upload a test lot CSV file to populate the graph and run the diagnostics.")
     st.stop() 
 
 # =====================================================================
-# DATA PROCESSING & DYNAMIC MAPPING 
+# DATA PROCESSING (Module A Logic)
 # =====================================================================
 
 df = pd.read_csv(uploaded_file)
-df.columns = df.columns.str.strip() # Clean hidden spaces
+df.columns = df.columns.str.strip() 
 
 st.success("CSV Uploaded Successfully!")
 
@@ -68,44 +52,43 @@ col_map1, col_map2 = st.columns(2)
 with col_map1:
     id_col = st.selectbox("Select Identifier Column:", df.columns, index=0)
 with col_map2:
-    # Filter to only show numeric columns for the math
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
     if not numeric_cols:
-        st.error("❌ No numeric columns found in the CSV. DPAT requires numerical telemetry data.")
+        st.error("❌ No numeric columns found in the CSV. Analysis requires numerical telemetry data.")
         st.stop()
-    metric_col = st.selectbox("Select Telemetry Metric:", numeric_cols, index=0 if len(numeric_cols) > 0 else None)
+    # Default to 'Value_0h' if it exists, otherwise use the first numeric column
+    default_metric = "Value_0h" if "Value_0h" in numeric_cols else numeric_cols[0]
+    metric_col = st.selectbox("Select Telemetry Metric:", numeric_cols, index=numeric_cols.index(default_metric))
 
 st.markdown("---")
 
-# 4. Math: DPAT Boundaries (Using dynamic metric_col)
-q1 = df[metric_col].quantile(0.25)
-q3 = df[metric_col].quantile(0.75)
-iqr = q3 - q1
-robust_std = iqr * 0.7413
-median = df[metric_col].median()
-
-upper_bound = median + (sigma_limit * robust_std)
-lower_bound = median - (sigma_limit * robust_std)
-
-# 5. Determine Anomaly Status (With crash-protection for the ML model)
-ml_used = False
-if model is not None:
-    try:
-        features = df.drop(columns=[id_col], errors='ignore')
-        predictions = model.predict(features)
-        df['Status'] = np.where(predictions == 1, "Anomaly", "Pass")
-        ml_used = True
-    except Exception as e:
-        # If the model crashes (e.g., wrong column names), fallback to math
-        df["Status"] = np.where((df[metric_col] > upper_bound) | (df[metric_col] < lower_bound), "Anomaly", "Pass")
-        st.sidebar.error(f"⚠️ ML Prediction Failed: {e}. Falling back to DPAT math.")
+# 4. Math: Module A MAD Logic
+# The teammate grouped by Lot_ID. If Lot_ID is missing from the uploaded CSV, we treat the whole file as one lot.
+if "Lot_ID" in df.columns:
+    df["Median"] = df.groupby("Lot_ID")[metric_col].transform("median")
 else:
-    df["Status"] = np.where((df[metric_col] > upper_bound) | (df[metric_col] < lower_bound), "Anomaly", "Pass")
+    df["Median"] = df[metric_col].median()
 
-# 6. Section 1: Macro View (AI-Driven Graph)
+df["Deviations"] = abs(df[metric_col] - df["Median"])
+
+if "Lot_ID" in df.columns:
+    df["MAD"] = df.groupby("Lot_ID")["Deviations"].transform("median")
+else:
+    df["MAD"] = df["Deviations"].median()
+
+df["Anomaly_Score"] = df["Deviations"] / (df["MAD"] + 1e-9)
+
+# 5. Determine Anomaly Status based on Module A logic
+df["Status"] = np.where(df["Anomaly_Score"] > mad_threshold, "Anomaly", "Pass")
+
+# Calculate upper and lower bounds for the graph visually based on the MAD score
+upper_bound = df["Median"].iloc[0] + (mad_threshold * df["MAD"].iloc[0])
+lower_bound = df["Median"].iloc[0] - (mad_threshold * df["MAD"].iloc[0])
+
+
+# 6. Section 1: Macro View (MAD Graph)
 fig = go.Figure()
 
-# Plot points exactly as classified by the active engine
 fig.add_trace(go.Scatter(
     x=df[df["Status"]=="Pass"].index, 
     y=df[df["Status"]=="Pass"][metric_col],
@@ -118,22 +101,19 @@ fig.add_trace(go.Scatter(
     mode='markers', name='Anomaly Flagged', marker=dict(color='#EF553B', size=12, symbol='x')
 ))
 
-# ONLY show the DPAT boundaries if the AI model is offline (fallback mode)
-if not ml_used:
-    fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Upper Bound")
-    fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Lower Bound")
-    graph_title = f"Statistical DPAT Analysis: {metric_col}"
-else:
-    graph_title = f"AI Engine Latent Anomaly Detection (Viewing Feature: {metric_col})"
+fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_text=f"MAD Upper Bound ({mad_threshold})")
+fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text=f"MAD Lower Bound ({mad_threshold})")
 
 fig.update_layout(
-    title=graph_title,
+    title=f"Statistical MAD Analysis: {metric_col}",
     xaxis_title=f"{id_col} (Index)", 
     yaxis_title=metric_col,
     modebar=dict(color='gray', activecolor='#00CC96') 
 )
 
 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+
+st.markdown("---") 
 
 # 7. Section 2: Micro View (Diagnostic Report)
 st.subheader("Automated QA Inspector Diagnostics")
@@ -145,12 +125,11 @@ with col1:
     st.metric("Sensor Reading", f"{comp_data[metric_col]:.2f}")
 with col2:
     if comp_data["Status"] == "Pass":
-        st.success("🟢 Confidence Score: 98% (Safe)")
+        st.success("🟢 Status: Safe")
     else:
-        st.error("🔴 Confidence Score: 12% (Latent Anomaly Detected)")
+        st.error("🔴 Status: Latent Anomaly Detected")
 with col3:
-    deviation = abs(comp_data[metric_col] - median)
-    st.metric("Deviation from Median", f"{deviation:.2f}")
+    st.metric("Anomaly Score (MAD multiplier)", f"{comp_data['Anomaly_Score']:.2f}")
     
 st.markdown("### 📋 Physics-Based Reasoning Report")
 
@@ -158,11 +137,11 @@ if comp_data["Status"] == "Anomaly":
     st.error(f"""
     **Failure Analysis for {selected_comp}:**
     This component has been flagged. Its internal **{metric_col}** reading ({comp_data[metric_col]:.2f}) 
-    has breached the dynamic mission safety tolerance. 
+    has breached the dynamic mission safety tolerance based on Median Absolute Deviation (MAD).
     
-    * **Baseline Median:** {median:.2f}
-    * **Allowed Deviation:** ±{(sigma_limit * robust_std):.2f} (Sigma: {sigma_limit})
-    * **Actual Deviation:** {deviation:.2f}
+    * **Lot Baseline Median:** {comp_data['Median']:.2f}
+    * **Lot MAD:** {comp_data['MAD']:.2f}
+    * **Calculated Anomaly Score:** {comp_data['Anomaly_Score']:.2f} (Threshold: > {mad_threshold})
     
     **Recommendation:** Isolate {selected_comp} from the current ISRO test lot immediately. Proceed with secondary manual inspection.
     """)
@@ -170,5 +149,5 @@ else:
     st.success(f"""
     **Pass Analysis for {selected_comp}:**
     This component is operating within safe physical boundaries. The **{metric_col}** reading ({comp_data[metric_col]:.2f}) 
-    falls well within the acceptable limits. No latent drift detected.
+    falls well within the acceptable limits (Anomaly Score: {comp_data['Anomaly_Score']:.2f}). No latent drift detected.
     """)
