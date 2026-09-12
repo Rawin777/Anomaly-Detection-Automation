@@ -18,19 +18,19 @@ Our project tries to identify this type of abnormal behaviour at an early stage.
 
 #**Proposed Solution**
 
-We use **statistics and machine learning** to analyse ESS data.
+We use statistics and machine learning to analyse ESS data.
 
 The system :
 
-   1. Processes ESS measurement data.
+1.Processes ESS measurement data.
 
-   2. Creates a dynamic baseline for normal behaviour.
+2.Creates a dynamic baseline for normal behaviour.
 
-   3. Finds abnormal component behaviour.
+3.Finds abnormal component behaviour.
 
-   4. Uses early measurements like **0h and 24h** to predict the behaviour at **168h**.
+4.Uses early measurements like **0h and 24h** to predict the behaviour at **168h**.
 
-   5. Combines these results to give a risk level.
+5.Combines these results to give a risk level.
 
 The final output can be:
 
@@ -40,7 +40,7 @@ The final output can be:
 
 -High Risk
 
-    6.Provides an explainable result.
+6.Provides an explainable result.
 
 #**WorkFlow**
 
@@ -100,7 +100,7 @@ Measurements are considered at different time points:
 
 -We use early measurements,mainly **oh and 24h**,to estimate how the component may behave **168h**.
 
-4.Risk Score 
+4.Risk Score
 
 -Anomaly and drift information are combined to generate a risk decision.
 
@@ -110,15 +110,15 @@ Measurements are considered at different time points:
 
 6.Human-in-the-Loop QA Support
 
--The system supports **QA Engineers** by providing the risk level and supporting evidence.The final decision is reviewed by a human instead of being completely automated.
+-The system supports QA Engineers by providing the risk level and supporting evidence.The final decision is reviewed by a human instead of being completely automated.
 
 #**Expected Impact**
 
-Our project aims to: 
+Our project aims to:
 
 -Identify abnormal component behaviour earlier.
 
--Give an early warning by predicting **168h drift** using early measurements.
+-Give an early warning by predicting 168h drift using early measurements.
 
 -Reduce the risk of defective components escaping screening process.
 
