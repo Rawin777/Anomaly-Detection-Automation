@@ -71,3 +71,6 @@ with col3:
     st.write("**Physics-Based Parameter Deviation:**")
     st.write(f"Deviation from Median: {abs(comp_data['Cryo_Pressure_psi'] - median):.2f} psi")
     st.caption("Robust Standard Deviation limit exceeded." if comp_data["Status"] == "Anomaly" else "Within normal DPAT bounds.")
+
+# pip install streamlit pandas numpy plotly
+# streamlit run backend\app.py
