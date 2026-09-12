@@ -34,9 +34,13 @@ iqr = q3 - q1
 robust_std = iqr * 0.7413
 median = df["Cryo_Pressure_psi"].median()
 
-# Define boundaries (Median +/- 6 * Robust SD is a standard aerospace tolerance)
-upper_bound = median + (6 * robust_std)
-lower_bound = median - (6 * robust_std)
+# ADD THIS: Interactive Sidebar Slider for the QA Inspector
+st.sidebar.header("⚙️ Mission Parameters")
+sigma_limit = st.sidebar.slider("DPAT Sigma Tolerance", min_value=1.0, max_value=10.0, value=6.0, step=0.5)
+
+# Update the boundaries to use the dynamic sigma_limit instead of the hardcoded 6
+upper_bound = median + (sigma_limit * robust_std)
+lower_bound = median - (sigma_limit * robust_std)
 df["Status"] = np.where((df["Cryo_Pressure_psi"] > upper_bound) | (df["Cryo_Pressure_psi"] < lower_bound), "Anomaly", "Pass")
 
 # 3. Module D: Lot Distribution Curve
