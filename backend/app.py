@@ -13,7 +13,10 @@ st.markdown("**Modules C & D Interface**: Batch processing, distribution curves,
 # 1. Load AI model
 @st.cache_resource
 def load_model():
-    model_path = "Modules/module_b.pkl"
+    # Construct an absolute path based on where app.py is located
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "Modules", "module_b.pkl")
+    
     if os.path.exists(model_path):
         return joblib.load(model_path)
     return None 
@@ -99,9 +102,10 @@ if model is not None:
 else:
     df["Status"] = np.where((df[metric_col] > upper_bound) | (df[metric_col] < lower_bound), "Anomaly", "Pass")
 
-# 6. Section 1: Macro View (Populated Graph)
+# 6. Section 1: Macro View (AI-Driven Graph)
 fig = go.Figure()
 
+# Plot points exactly as classified by the active engine
 fig.add_trace(go.Scatter(
     x=df[df["Status"]=="Pass"].index, 
     y=df[df["Status"]=="Pass"][metric_col],
@@ -114,18 +118,22 @@ fig.add_trace(go.Scatter(
     mode='markers', name='Anomaly Flagged', marker=dict(color='#EF553B', size=12, symbol='x')
 ))
 
-fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Upper Bound")
-fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Lower Bound")
+# ONLY show the DPAT boundaries if the AI model is offline (fallback mode)
+if not ml_used:
+    fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Upper Bound")
+    fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text="DPAT Lower Bound")
+    graph_title = f"Statistical DPAT Analysis: {metric_col}"
+else:
+    graph_title = f"AI Engine Latent Anomaly Detection (Viewing Feature: {metric_col})"
 
 fig.update_layout(
+    title=graph_title,
     xaxis_title=f"{id_col} (Index)", 
     yaxis_title=metric_col,
     modebar=dict(color='gray', activecolor='#00CC96') 
 )
 
 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
-
-st.markdown("---") 
 
 # 7. Section 2: Micro View (Diagnostic Report)
 st.subheader("Automated QA Inspector Diagnostics")
