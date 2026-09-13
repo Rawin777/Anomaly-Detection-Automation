@@ -98,12 +98,12 @@ for col in required_cols:
         st.error(f"❌ Invalid CSV. The file must contain '{col}'.")
         st.stop()
 
-# 4. Feature Engineering (Corrected for Hourly Rates)
+# 4. Feature Engineering 
 df["Early_Drift"] = df["Value_24h"] - df["Value_0h"]
 df["Early_Drift_Rate"] = df["Early_Drift"] / 24.0
 safety_drift_rate = safety_early_drift / 24.0
 
-# 5. Module B: Predict 168h using the .pkl file
+# 5. Module B: Predict 168h 
 if model is not None:
     X = df[["Value_0h", "Value_24h"]]
     df["Predicted_168h"] = model.predict(X)
@@ -113,7 +113,7 @@ else:
 df["Predicted_Early_to_168_Drift"] = df["Predicted_168h"] - df["Value_24h"]
 df["Predicted_168h_Drift_Rate"] = df["Predicted_Early_to_168_Drift"] / 144.0
 
-# 6. Module A: Robust Z-Score against lot baseline
+# 6. Module A: Robust Z-Score 
 if "Lot_ID" in df.columns:
     df["Lot_Median"] = df.groupby("Lot_ID")["Value_24h"].transform("median")
     df["Lot_MAD"] = df.groupby("Lot_ID")["Value_24h"].transform(lambda s: np.median(np.abs(s - np.median(s))))
@@ -124,7 +124,7 @@ else:
 scale = (1.4826 * df["Lot_MAD"]).replace(0, np.nan)
 df["Lot_Robust_Z"] = ((df["Value_24h"] - df["Lot_Median"]) / scale).abs().fillna(0)
 
-# Flag logic based on corrected drift rates
+# Flag logic
 df["Anomaly_Flag"] = df["Lot_Robust_Z"] >= z_threshold
 df["Drift_Risk_Flag"] = (df["Predicted_168h_Drift_Rate"] > safety_drift_rate) | (df["Early_Drift_Rate"] > safety_drift_rate)
 
@@ -144,19 +144,30 @@ def risk(row):
 df[["Risk", "Reason"]] = df.apply(lambda r: pd.Series(risk(r)), axis=1)
 id_col = "Component_ID" if "Component_ID" in df.columns else df.columns[0]
 
+
+# =====================================================================
+# UI GRAPH & INTERACTIVITY 
+# =====================================================================
+
 # 7. Section 1: Macro View (Plotting Predicted 168h)
 fig = go.Figure()
 
+# Plot Safe Components
 fig.add_trace(go.Scatter(
     x=df[df["Risk"]=="NORMAL"].index, 
     y=df[df["Risk"]=="NORMAL"]["Predicted_168h"],
-    mode='markers', name='Pass (NORMAL)', marker=dict(color='#00CC96', size=8)
+    customdata=df[df["Risk"]=="NORMAL"][id_col],
+    mode='markers', name='Pass (NORMAL)', marker=dict(color='#00CC96', size=8),
+    hovertemplate="<b>%{customdata}</b><br>Predicted 168h: %{y:.2f}<extra></extra>"
 ))
 
+# Plot Anomalies
 fig.add_trace(go.Scatter(
     x=df[df["Risk"]!="NORMAL"].index, 
     y=df[df["Risk"]!="NORMAL"]["Predicted_168h"],
-    mode='markers', name='Flagged (REVIEW/HIGH RISK)', marker=dict(color='#EF553B', size=12, symbol='x')
+    customdata=df[df["Risk"]!="NORMAL"][id_col],
+    mode='markers', name='Flagged (REVIEW/HIGH RISK)', marker=dict(color='#EF553B', size=12, symbol='x'),
+    hovertemplate="<b>%{customdata}</b><br>Predicted 168h: %{y:.2f}<extra></extra>"
 ))
 
 plot_median = df["Predicted_168h"].median()
@@ -168,13 +179,20 @@ fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_
 fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text="Visual Lower Bound")
 
 fig.update_layout(
-    title="Module B: Predicted 168h Degradation Profile",
+    title="Module B: Predicted 168h Degradation Profile (Click any point to inspect)",
     xaxis_title=f"{id_col} (Index)", 
     yaxis_title="Predicted 168h Value",
     modebar=dict(color='gray', activecolor='#00CC96') 
 )
 
-st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+# Render the graph and capture click events!
+event = st.plotly_chart(
+    fig, 
+    use_container_width=True, 
+    theme="streamlit",
+    on_select="rerun",           # Tells Streamlit to update the UI instantly on click
+    selection_mode="points"      # Prevents lasso-selecting multiple points at once
+)
 
 # Total Anomalies Counter
 total_anomalies = len(df[df["Risk"] != "NORMAL"])
@@ -182,32 +200,59 @@ st.markdown(f"**⚠️ Total Anomalies Flagged:** {total_anomalies} out of {len(
 
 st.markdown("---") 
 
+# =====================================================================
+# SELECTION & DIAGNOSTICS LOGIC
+# =====================================================================
+
+# Initialize memory so Streamlit remembers what component we are looking at
+if "selected_comp" not in st.session_state:
+    st.session_state.selected_comp = df[id_col].iloc[0]
+if "last_clicked" not in st.session_state:
+    st.session_state.last_clicked = None
+
+# Check if the user just clicked a point on the graph
+current_click = None
+if event and event.get("selection") and event["selection"].get("points"):
+    current_click = event["selection"]["points"][0].get("x")
+
+# If they clicked a *new* point, force the diagnostic section to update to that component
+if current_click is not None and current_click != st.session_state.last_clicked:
+    st.session_state.last_clicked = current_click
+    if current_click in df.index:
+        st.session_state.selected_comp = df.loc[current_click, id_col]
+elif current_click is None:
+    st.session_state.last_clicked = None
+
+
 # 8. Section 2: Micro View (Explainable AI Diagnostic Report)
 st.subheader("Explainable AI Diagnostics")
 
 col_search1, col_search2 = st.columns(2)
 
 with col_search1:
-    # Text input acts as a live filter for the dropdown
     search_query = st.text_input("🔍 Filter Component ID:", placeholder="e.g., test or 001 (Case-Insensitive)")
 
-# Filter the dataframe IDs based on the search query
+# Filter the dropdown list based on what the user types
 if search_query:
-    # case=False makes it case-insensitive, na=False prevents errors on empty rows
     matching_ids = df[df[id_col].astype(str).str.contains(search_query, case=False, na=False)][id_col].tolist()
 else:
     matching_ids = df[id_col].tolist()
 
-# Fallback just in case they type a component that doesn't exist at all
 if not matching_ids:
     st.warning(f"No components found matching '{search_query}'. Showing all components.")
     matching_ids = df[id_col].tolist()
 
-with col_search2:
-    # The dropdown now only shows the filtered results
-    selected_comp = st.selectbox("Select from matching components:", matching_ids)
+# Ensure the app doesn't crash if they filter out their currently selected component
+if st.session_state.selected_comp not in matching_ids:
+    st.session_state.selected_comp = matching_ids[0]
 
-comp_data = df[df[id_col] == selected_comp].iloc[0]
+with col_search2:
+    default_idx = matching_ids.index(st.session_state.selected_comp)
+    user_selection = st.selectbox("Select from matching components:", matching_ids, index=default_idx)
+    st.session_state.selected_comp = user_selection
+
+# Pull the specific data for the finalized component
+comp_data = df[df[id_col] == st.session_state.selected_comp].iloc[0]
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -221,24 +266,24 @@ st.markdown("### 📋 Automated Reasoning Report")
 
 if comp_data["Risk"] == "NORMAL":
     st.success(f"""
-    **Pass Analysis for {selected_comp}:**
+    **Pass Analysis for {st.session_state.selected_comp}:**
     {comp_data['Reason']}
     * **Projected Drift Rate:** {comp_data['Predicted_168h_Drift_Rate']:.4f}/hr (Max Allowed: {safety_drift_rate:.4f}/hr)
     * **Lot Robust Z-Score:** {comp_data['Lot_Robust_Z']:.2f}
     """)
 elif comp_data["Risk"] == "REVIEW":
     st.warning(f"""
-    **Secondary Review Required for {selected_comp}:**
+    **Secondary Review Required for {st.session_state.selected_comp}:**
     {comp_data['Reason']}
     * **Projected Drift Rate:** {comp_data['Predicted_168h_Drift_Rate']:.4f}/hr (Max Allowed: {safety_drift_rate:.4f}/hr)
     * **Lot Robust Z-Score:** {comp_data['Lot_Robust_Z']:.2f}
     """)
 else:
     st.error(f"""
-    **High Risk Anomaly Detected for {selected_comp}:**
+    **High Risk Anomaly Detected for {st.session_state.selected_comp}:**
     {comp_data['Reason']}
     * **Projected Drift Rate:** {comp_data['Predicted_168h_Drift_Rate']:.4f}/hr (Max Allowed: {safety_drift_rate:.4f}/hr)
     * **Lot Robust Z-Score:** {comp_data['Lot_Robust_Z']:.2f} (Threshold: {z_threshold})
     
-    **Recommendation:** Isolate {selected_comp} from the current ESS lot immediately.
+    **Recommendation:** Isolate {st.session_state.selected_comp} from the current ESS lot immediately.
     """)
