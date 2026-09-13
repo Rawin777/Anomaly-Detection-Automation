@@ -176,11 +176,32 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
+# ADDED: Total Anomalies Counter
+total_anomalies = len(df[df["Risk"] != "NORMAL"])
+st.markdown(f"**⚠️ Total Anomalies Flagged:** {total_anomalies} out of {len(df)} components processed.")
+
 st.markdown("---") 
 
 # 8. Section 2: Micro View (Explainable AI Diagnostic Report)
 st.subheader("Module C: Explainable AI Diagnostics")
-selected_comp = st.selectbox("Select a Component to Inspect:", df[id_col])
+
+# ADDED: Dual-input selection (Type to search OR use dropdown)
+col_search1, col_search2 = st.columns(2)
+with col_search1:
+    typed_comp = st.text_input("🔍 Search Component ID manually:", placeholder="e.g., TEST_001")
+with col_search2:
+    dropdown_comp = st.selectbox("Or select from dropdown:", df[id_col])
+
+# Resolve which input to use
+if typed_comp:
+    if typed_comp in df[id_col].values:
+        selected_comp = typed_comp
+    else:
+        st.warning(f"Component '{typed_comp}' not found. Defaulting to dropdown selection.")
+        selected_comp = dropdown_comp
+else:
+    selected_comp = dropdown_comp
+
 comp_data = df[df[id_col] == selected_comp].iloc[0]
 
 col1, col2, col3 = st.columns(3)
