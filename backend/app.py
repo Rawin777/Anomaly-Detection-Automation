@@ -183,7 +183,7 @@ st.markdown(f"**⚠️ Total Anomalies Flagged:** {total_anomalies} out of {len(
 st.markdown("---") 
 
 # 8. Section 2: Micro View (Explainable AI Diagnostic Report)
-st.subheader("Module C: Explainable AI Diagnostics")
+st.subheader("Explainable AI Diagnostics")
 
 col_search1, col_search2 = st.columns(2)
 
