@@ -176,7 +176,7 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
-# ADDED: Total Anomalies Counter
+# Total Anomalies Counter
 total_anomalies = len(df[df["Risk"] != "NORMAL"])
 st.markdown(f"**⚠️ Total Anomalies Flagged:** {total_anomalies} out of {len(df)} components processed.")
 
@@ -185,22 +185,27 @@ st.markdown("---")
 # 8. Section 2: Micro View (Explainable AI Diagnostic Report)
 st.subheader("Module C: Explainable AI Diagnostics")
 
-# ADDED: Dual-input selection (Type to search OR use dropdown)
 col_search1, col_search2 = st.columns(2)
-with col_search1:
-    typed_comp = st.text_input("🔍 Search Component ID manually:", placeholder="e.g., TEST_001")
-with col_search2:
-    dropdown_comp = st.selectbox("Or select from dropdown:", df[id_col])
 
-# Resolve which input to use
-if typed_comp:
-    if typed_comp in df[id_col].values:
-        selected_comp = typed_comp
-    else:
-        st.warning(f"Component '{typed_comp}' not found. Defaulting to dropdown selection.")
-        selected_comp = dropdown_comp
+with col_search1:
+    # Text input acts as a live filter for the dropdown
+    search_query = st.text_input("🔍 Filter Component ID:", placeholder="e.g., test or 001 (Case-Insensitive)")
+
+# Filter the dataframe IDs based on the search query
+if search_query:
+    # case=False makes it case-insensitive, na=False prevents errors on empty rows
+    matching_ids = df[df[id_col].astype(str).str.contains(search_query, case=False, na=False)][id_col].tolist()
 else:
-    selected_comp = dropdown_comp
+    matching_ids = df[id_col].tolist()
+
+# Fallback just in case they type a component that doesn't exist at all
+if not matching_ids:
+    st.warning(f"No components found matching '{search_query}'. Showing all components.")
+    matching_ids = df[id_col].tolist()
+
+with col_search2:
+    # The dropdown now only shows the filtered results
+    selected_comp = st.selectbox("Select from matching components:", matching_ids)
 
 comp_data = df[df[id_col] == selected_comp].iloc[0]
 
