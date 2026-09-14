@@ -170,13 +170,12 @@ fig.add_trace(go.Scatter(
     hovertemplate="<b>%{customdata}</b><br>Predicted 168h: %{y:.2f}<extra></extra>"
 ))
 
+# Calculate and plot ONLY the Upper Bound
 plot_median = df["Predicted_168h"].median()
 plot_mad = np.median(np.abs(df["Predicted_168h"] - plot_median))
 upper_bound = plot_median + (z_threshold * plot_mad)
-lower_bound = plot_median - (z_threshold * plot_mad)
 
 fig.add_hline(y=upper_bound, line_dash="dash", line_color="#FFA15A", annotation_text="Visual Upper Bound")
-fig.add_hline(y=lower_bound, line_dash="dash", line_color="#FFA15A", annotation_text="Visual Lower Bound")
 
 fig.update_layout(
     title="Module B: Predicted 168h Degradation Profile (Click any point to inspect)",
@@ -185,13 +184,13 @@ fig.update_layout(
     modebar=dict(color='gray', activecolor='#00CC96') 
 )
 
-# Render the graph and capture click events!
+# Render the graph and capture click events
 event = st.plotly_chart(
     fig, 
     use_container_width=True, 
     theme="streamlit",
-    on_select="rerun",           # Tells Streamlit to update the UI instantly on click
-    selection_mode="points"      # Prevents lasso-selecting multiple points at once
+    on_select="rerun",           
+    selection_mode="points"      
 )
 
 # Total Anomalies Counter
@@ -225,7 +224,7 @@ elif current_click is None:
 
 
 # 8. Section 2: Micro View (Explainable AI Diagnostic Report)
-st.subheader("Explainable AI Diagnostics")
+st.subheader("Module C: Explainable AI Diagnostics")
 
 col_search1, col_search2 = st.columns(2)
 
