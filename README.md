@@ -98,7 +98,7 @@ Measurements are considered at different time points:
 
 3.168h Drift Prediciton
 
--We use early measurements,mainly **oh and 24h**,to estimate how the component may behave **168h**.
+-We use early measurements,mainly **0h and 24h**,to estimate how the component may behave **168h**.
 
 4.Risk Score
 
@@ -106,7 +106,7 @@ Measurements are considered at different time points:
 
 5.Explanation
 
--The system provides the reason for the risk,such as abnormal deviation or excessive grift.
+-The system provides the reason for the risk,such as abnormal deviation or excessive drift.
 
 6.Human-in-the-Loop QA Support
 
@@ -122,12 +122,14 @@ Our project aims to:
 
 -Reduce the risk of defective components escaping screening process.
 
--Help QA Engineers make more decision.
+-Help QA Engineers make better decisions.
 
 -Provides an explainable risk decision instead of simple PASS/FAIL result.
 
 #**Team**
+
 **Prototype:** https://q9kbbqptxac9nhhaapnp6z.streamlit.app/
+
 **Team Name**: SignalForge
 
 **Problem StatementID**: SIH26170
