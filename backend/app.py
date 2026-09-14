@@ -55,8 +55,8 @@ model, status_msg = load_model()
 
 # Sidebar: Mission Parameters & System Status
 st.sidebar.header("⚙️ Mission Parameters")
-z_threshold = st.sidebar.slider("Module A: Robust Z-Score Threshold", min_value=1.0, max_value=10.0, value=3.5, step=0.1)
-safety_early_drift = st.sidebar.number_input("Module B: Safety Early Drift (24h Max)", value=0.20, step=0.01)
+z_threshold = st.sidebar.slider("Robust Outlier Threshold", min_value=1.0, max_value=10.0, value=3.5, step=0.1)
+safety_early_drift = st.sidebar.number_input("Safety Early Drift (24h Max)", value=0.20, step=0.01)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🧠 System Status")
